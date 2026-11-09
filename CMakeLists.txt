@@ -3,4 +3,7 @@ project(obsidian_optimizer)
 
 set(CMAKE_CXX_STANDARD 20)
 
-add_executable(obsidian_optimizer main.cpp)
+add_executable(obsidian_optimizer main.cpp
+        VaultScanner.cpp
+        VaultScanner.h
+)
