@@ -1,0 +1,99 @@
+
+# ==========================================
+# CMake Build Directories
+# ==========================================
+build/
+build-*/
+cmake-build-*/
+out/
+
+# CMake Generated Files
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+CTestTestfile.cmake
+Makefile
+compile_commands.json
+install_manifest.txt
+
+# ==========================================
+# Compiled Binaries & Object Files
+# ==========================================
+*.o
+*.obj
+*.a
+*.so
+*.dylib
+*.dll
+*.exe
+*.out
+*.app/
+*.dSYM/
+
+# ==========================================
+# CLion / JetBrains IDE
+# ==========================================
+.idea/
+*.iml
+
+# ==========================================
+# macOS
+# ==========================================
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# ==========================================
+# Local Configuration
+# ==========================================
+config/vaults.txt
+.env
+.env.*
+!.env.example
+
+# ==========================================
+# SQLite Databases
+# ==========================================
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+
+# ==========================================
+# Temporary Compression Files
+# ==========================================
+*.tmp
+*.temp
+*.bak
+*.partial
+*.part
+
+# ==========================================
+# Logs and Runtime Files
+# ==========================================
+*.log
+logs/
+runtime/
+*.pid
+*.lock
+
+# ==========================================
+# Testing and Coverage
+# ==========================================
+Testing/
+coverage/
+*.gcda
+*.gcno
+*.gcov
+*.profraw
+*.profdata
+
+# ==========================================
+# Editor / Miscellaneous
+# ==========================================
+*.swp
+*.swo
+*~
+.vscode/
