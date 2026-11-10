@@ -4,6 +4,11 @@
 #include <cerrno>
 #include <cctype>
 #include <cstdlib>
+#include <array>
+#include <fstream>
+#ifdef __APPLE__
+#include <copyfile.h>
+#endif
 #include <spawn.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -12,8 +17,24 @@
 extern char** environ;
 namespace fs = std::filesystem;
 
-bool CompressionEngine::compress(const fs::path& input, const fs::path& output) {
+namespace {
+bool identicalFiles(const fs::path& left, const fs::path& right) {
+    std::ifstream a(left, std::ios::binary), b(right, std::ios::binary);
+    if (!a || !b) return false;
+    std::array<char, 65536> first{}, second{};
+    do {
+        a.read(first.data(), first.size());
+        b.read(second.data(), second.size());
+        if (a.bad() || b.bad() || a.gcount() != b.gcount() ||
+            !std::equal(first.begin(), first.begin() + a.gcount(), second.begin())) return false;
+    } while (!a.eof() && !b.eof());
+    return a.eof() && b.eof();
+}
+}
+
+bool CompressionEngine::compress(const fs::path& input) {
     message.clear();
+    error = true;
     fs::path temporaryDirectory;
     auto cleanup = [&] {
         std::error_code ec;
@@ -21,13 +42,12 @@ bool CompressionEngine::compress(const fs::path& input, const fs::path& output) 
     };
     try {
         const auto source = fs::absolute(input);
-        const auto destination = fs::absolute(output);
         if (fs::is_symlink(source) || !fs::is_regular_file(source)) {
             message = "Input must be a regular file, not a symlink";
             return false;
         }
-        if (fs::exists(destination) || fs::is_symlink(destination)) {
-            message = "Output already exists";
+        if (access(source.c_str(), W_OK) != 0 || fs::hard_link_count(source) != 1) {
+            message = "Input must be writable and have no additional hard links";
             return false;
         }
         auto extension = source.extension().string();
@@ -38,8 +58,9 @@ bool CompressionEngine::compress(const fs::path& input, const fs::path& output) 
             return false;
         }
         const auto originalSize = fs::file_size(source);
-        fs::create_directories(destination.parent_path());
-        auto pattern = (destination.parent_path() / ".compression-XXXXXX").string();
+        const auto originalTime = fs::last_write_time(source);
+        const auto originalPermissions = fs::status(source).permissions();
+        auto pattern = (source.parent_path() / ".compression-XXXXXX").string();
         std::vector<char> buffer(pattern.begin(), pattern.end());
         buffer.push_back('\0');
         if (!mkdtemp(buffer.data())) {
@@ -48,12 +69,14 @@ bool CompressionEngine::compress(const fs::path& input, const fs::path& output) 
         }
         temporaryDirectory = buffer.data();
         const auto candidate = temporaryDirectory / ("image" + extension);
+        const auto snapshot = temporaryDirectory / ("original" + extension);
+        fs::copy_file(source, snapshot);
         std::vector<std::string> arguments;
         if (extension == ".png") {
             // Recompress IDAT only: retain bit depth, color type, and ancillary chunks.
-            arguments = {"optipng", "-quiet", "-o2", "-nx", "-out", candidate.string(), source.string()};
+            arguments = {"optipng", "-quiet", "-o2", "-nx", "-out", candidate.string(), snapshot.string()};
         } else {
-            arguments = {"jpegtran", "-copy", "all", "-optimize", "-outfile", candidate.string(), source.string()};
+            arguments = {"jpegtran", "-copy", "all", "-optimize", "-outfile", candidate.string(), snapshot.string()};
         }
         std::vector<char*> argv;
         for (auto& argument : arguments) argv.push_back(argument.data());
@@ -80,13 +103,32 @@ bool CompressionEngine::compress(const fs::path& input, const fs::path& output) 
         }
         const auto compressedSize = fs::file_size(candidate);
         if (compressedSize >= originalSize) {
-            message = "Already optimized; no smaller copy produced";
+            message = "Already optimized; original unchanged";
+            error = false;
             cleanup();
             return false;
         }
-        // Publish without replacing any existing file, even if created during compression.
-        fs::create_hard_link(candidate, destination);
+        if (fs::is_symlink(source) || !fs::is_regular_file(source) ||
+            fs::hard_link_count(source) != 1 || fs::last_write_time(source) != originalTime ||
+            fs::status(source).permissions() != originalPermissions ||
+            !identicalFiles(source, snapshot)) {
+            message = "Input changed during compression; original unchanged";
+            cleanup();
+            return false;
+        }
+#ifdef __APPLE__
+        if (copyfile(source.c_str(), candidate.c_str(), nullptr, COPYFILE_METADATA) != 0) {
+            message = "Could not preserve file metadata; original unchanged";
+            cleanup();
+            return false;
+        }
+#endif
+        fs::permissions(candidate, originalPermissions);
+        fs::last_write_time(candidate, originalTime);
+        // Both paths are on the same filesystem: rename publishes the complete file atomically.
+        fs::rename(candidate, source);
         message = "Saved " + std::to_string(originalSize - compressedSize) + " bytes";
+        error = false;
         cleanup();
         return true;
     } catch (const fs::filesystem_error& error) {
