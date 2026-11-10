@@ -8,4 +8,6 @@ add_executable(obsidian_optimizer main.cpp
         VaultScanner.h
         MediaScanner.cpp
         MediaScanner.h
+        CompressionEngine.cpp
+        CompressionEngine.h
 )

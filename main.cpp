@@ -5,14 +5,20 @@
 #include <fstream>
 #include "VaultScanner.h"
 #include "MediaScanner.h"
+#include "CompressionEngine.h"
 
 namespace fs = std::filesystem;
 using namespace std;
 
-int main() {
+int main(int argc, char* argv[]) {
+    const bool compress = argc == 2 && string(argv[1]) == "--compress";
+    if (argc > 1 && !compress) {
+        cerr << "Usage: obsidian_optimizer [--compress]" << endl;
+        return 1;
+    }
     string filePath;
     cout << "Enter absolute path to 'vaultpaths.txt' ";
-    cin >> filePath;
+    getline(cin, filePath);
 
     ifstream file(filePath);
 
@@ -46,6 +52,17 @@ int main() {
 
     for (auto& mFile: mediaFiles)
         cout << mFile << endl;
+
+    if (compress) {
+        CompressionEngine engine;
+        size_t compressed = 0;
+        for (const auto& image : mediaFiles) {
+            const auto output = image.parent_path() / ".optimized-media" / image.filename();
+            if (engine.compress(image, output)) ++compressed;
+            cout << image << ": " << engine.lastMessage() << endl;
+        }
+        cout << "Smaller copies created: " << compressed << endl;
+    }
 
     return 0;
 }

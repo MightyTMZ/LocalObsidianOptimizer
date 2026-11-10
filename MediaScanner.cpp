@@ -28,7 +28,8 @@ vector<filesystem::path> MediaScanner::discoverMedia(
             if (entry.is_directory(ec) && !ec) {
                 // Don't traverse Obsidian configuration or Git directories.
                 if (path.filename() == ".obsidian" ||
-                    path.filename() == ".git") {
+                    path.filename() == ".git" ||
+                    path.filename() == ".optimized-media") {
                     it.disable_recursion_pending();
                     }
             }
