@@ -4,6 +4,7 @@
 #include <string>
 #include <fstream>
 #include "VaultScanner.h"
+#include "MediaScanner.h"
 
 namespace fs = std::filesystem;
 using namespace std;
@@ -27,14 +28,24 @@ int main() {
     }
     file.close();
 
-    VaultScanner scanner;
+    cout << "Roots loaded: " << roots.size() << endl;
 
-    // Find valid Obsidian vaults
-    const auto vaults = scanner.discoverVaults(roots);
+    VaultScanner vaultScanner;
 
-    for (const auto& vault:vaults) {
-        cout << "Found vault: " << vault << endl;
-    }
+    cout << "Discovering vaults..." << endl;
+    const auto vaults = vaultScanner.discoverVaults(roots);
+
+    cout << "Vaults discovered: " << vaults.size() << endl;
+
+    MediaScanner mediaScanner;
+
+    cout << "Discovering media..." << endl;
+    const auto mediaFiles = mediaScanner.discoverMedia(vaults);
+
+    cout << "Media files discovered: " << mediaFiles.size() << endl;
+
+    for (auto& mFile: mediaFiles)
+        cout << mFile << endl;
 
     return 0;
 }
